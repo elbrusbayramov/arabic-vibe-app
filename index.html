@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Arabic Vibe — Тренажер: Умра</title>
+    <title>Arabic Vibe — Тренажер слов</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
@@ -17,26 +17,51 @@
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
         body { background: var(--bg); color: var(--text); display: flex; flex-direction: column; min-height: 100vh; padding: 16px; }
-        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
         .badge { background: rgba(212, 175, 55, 0.15); color: var(--gold); padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; }
         .lang-switch button { background: var(--card); border: 1px solid #333; color: var(--text); padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: 13px; }
         .lang-switch button.active { border-color: var(--gold); color: var(--gold); }
-        
+
+        .episodes-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 10px; scrollbar-width: none; }
+        .episodes-bar::-webkit-scrollbar { display: none; }
+        .ep-btn { white-space: nowrap; background: var(--card); border: 1px solid rgba(255,255,255,0.08); color: var(--muted); padding: 8px 14px; border-radius: 12px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+        .ep-btn.active { background: rgba(212, 175, 55, 0.15); border-color: var(--gold); color: var(--gold); font-weight: 600; }
+
         .progress-bar { width: 100%; height: 6px; background: var(--card); border-radius: 3px; overflow: hidden; margin-bottom: 20px; }
         .progress-fill { height: 100%; background: var(--gold); width: 0%; transition: width 0.3s ease; }
 
         .card-container { perspective: 1000px; flex: 1; display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
-        .card { width: 100%; max-width: 400px; min-height: 320px; position: relative; transform-style: preserve-3d; transition: transform 0.5s cubic-bezier(0.4, 0.2, 0.2, 1); cursor: pointer; }
+        .card { width: 100%; max-width: 400px; min-height: 340px; position: relative; transform-style: preserve-3d; transition: transform 0.5s cubic-bezier(0.4, 0.2, 0.2, 1); cursor: pointer; }
         .card.flipped { transform: rotateY(180deg); }
         .card-face { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; background: var(--card); border-radius: 20px; padding: 24px; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; border: 1px solid rgba(255,255,255,0.06); box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
         .card-back { transform: rotateY(180deg); justify-content: space-between; }
 
-        .arabic-word { font-size: 46px; font-weight: 700; color: var(--gold); direction: rtl; margin-bottom: 12px; line-height: 1.4; }
-        .hint { font-size: 13px; color: var(--muted); }
+        .arabic-word { font-size: 44px; font-weight: 700; color: var(--gold); direction: rtl; margin-bottom: 16px; line-height: 1.4; }
+        .hint { font-size: 13px; color: var(--muted); margin-top: 16px; }
+        
+        /* Кнопка озвучки */
+        .audio-btn {
+            background: rgba(212, 175, 55, 0.12);
+            border: 1px solid rgba(212, 175, 55, 0.4);
+            color: var(--gold);
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: transform 0.15s, background 0.2s;
+        }
+        .audio-btn:active { transform: scale(0.95); background: rgba(212, 175, 55, 0.25); }
+        .audio-btn-small { padding: 4px 12px; font-size: 12px; margin-top: 8px; }
+
         .root-tag { background: #2a2f37; padding: 4px 12px; border-radius: 12px; font-size: 14px; color: var(--gold); direction: rtl; }
-        .translation { font-size: 24px; font-weight: 600; margin: 12px 0; }
+        .translation { font-size: 22px; font-weight: 600; margin: 10px 0; }
         .context-box { background: rgba(0,0,0,0.25); padding: 14px; border-radius: 12px; width: 100%; border-right: 3px solid var(--gold); }
-        .context-ar { font-size: 20px; direction: rtl; color: #fff; margin-bottom: 6px; }
+        .context-ar { font-size: 19px; direction: rtl; color: #fff; margin-bottom: 6px; }
         .context-tr { font-size: 13px; color: var(--muted); }
 
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; max-width: 400px; width: 100%; margin: 0 auto; }
@@ -62,78 +87,156 @@
     </div>
 </header>
 
+<div class="episodes-bar" id="episodes-bar"></div>
 <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
 
 <div class="card-container" id="card-area">
     <div class="card" id="flashcard" onclick="flipCard()">
         <div class="card-face card-front">
-            <div class="arabic-word" id="word-ar">رِحْلَةٌ</div>
-            <div class="hint" id="tap-hint">Нажмите, чтобы перевернуть</div>
+            <div class="arabic-word" id="word-ar"></div>
+            <!-- event.stopPropagation() не дает карточке перевернуться при клике на звук -->
+            <button class="audio-btn" onclick="event.stopPropagation(); playWordAudio()">
+                🔊 <span id="listen-word-txt">Слушать</span>
+            </button>
+            <div class="hint" id="tap-hint"></div>
         </div>
         <div class="card-face card-back">
-            <div class="root-tag" id="word-root">Корень: ر - ح - ل</div>
-            <div class="translation" id="word-tr">Путешествие</div>
+            <div class="root-tag" id="word-root"></div>
+            <div class="translation" id="word-tr"></div>
             <div class="context-box">
-                <div class="context-ar" id="ctx-ar">نَبْدَأُ رِحْلَةَ الْعُمْرَةِ مِنْ بَاكُو</div>
-                <div class="context-tr" id="ctx-tr">Мы начинаем путешествие Умры из Баку</div>
+                <div class="context-ar" id="ctx-ar"></div>
+                <div class="context-tr" id="ctx-tr"></div>
+                <button class="audio-btn audio-btn-small" onclick="event.stopPropagation(); playContextAudio()">
+                    🔊 <span id="listen-ctx-txt">Фраза</span>
+                </button>
             </div>
         </div>
     </div>
 </div>
 
-<div class="controls" id="controls">
-    <button class="btn btn-flip" id="flip-btn" onclick="flipCard()">Показать перевод</button>
-</div>
+<div class="controls" id="controls"></div>
 
 <div class="done-screen" id="done-screen">
     <h2>Ма ша Аллах! 🎉</h2>
-    <p id="done-text">Вы повторили все слова из выпуска «Поездка в Умру».</p>
-    <button class="btn btn-flip" style="max-width: 260px;" onclick="restart()">Повторить заново</button>
+    <p id="done-text"></p>
+    <button class="btn btn-flip" style="max-width: 260px;" id="restart-btn" onclick="restart()">Повторить заново</button>
 </div>
 
 <script>
     const tg = window.Telegram?.WebApp;
     if (tg) { tg.expand(); }
 
-    const wordsData = [
-        { ar: "رِحْلَةٌ", root: "ر - ح - ل", tr: { ru: "Путешествие, поездка", en: "Journey, trip", az: "Səyahət, səfər" }, ctx_ar: "نَبْدَأُ رِحْلَةَ الْعُمْرَةِ مِنْ بَاكُو", ctx_tr: { ru: "Мы начинаем путешествие Умры из Баку", en: "We start the Umrah journey from Baku", az: "Bakıdan Ümrə səyahətinə başlayırıq" } },
-        { ar: "الطَّائِرَةُ", root: "ط - ي - ر", tr: { ru: "Самолет", en: "Airplane", az: "Təyyarə" }, ctx_ar: "نَحْنُ الْآنَ فِي الطَّائِرَةِ", ctx_tr: { ru: "Мы сейчас в самолете", en: "We are now on the airplane", az: "Biz indi təyyarədəyik" } },
-        { ar: "السَّحَابُ", root: "س - ح - ب", tr: { ru: "Облака", en: "Clouds", az: "Buludlar" }, ctx_ar: "الْجَوُّ جَمِيلٌ فَوْقَ السَّحَابِ", ctx_tr: { ru: "Погода прекрасна над облаками", en: "The weather is beautiful above the clouds", az: "Buludların üzərində hava gözəldir" } },
-        { ar: "الْأَرْضُ الْمُقَدَّسَةُ", root: "ق - د - س", tr: { ru: "Священная земля", en: "Holy land", az: "Müqəddəs torpaq" }, ctx_ar: "نَقْتَرِبُ مِنَ الْأَرْضِ الْمُقَدَّسَةِ", ctx_tr: { ru: "Мы приближаемся к священной земле", en: "We are approaching the holy land", az: "Müqəddəs torpağa yaxınlaşırıq" } },
-        { ar: "حَقَائِبُ", root: "ح - ق - ب", tr: { ru: "Чемоданы, багаж", en: "Bags, luggage", az: "Çamadanlar, yük" }, ctx_ar: "نَضَعُ حَقَائِبَنَا فِي الْفُنْدُقِ", ctx_tr: { ru: "Мы оставляем наши чемоданы в отеле", en: "We put our bags in the hotel", az: "Çamadanlarımızı otelə qoyuruq" } },
-        { ar: "الْحَرَمُ", root: "ح - ر - م", tr: { ru: "Заповедная мечеть (Харам)", en: "The Sanctuary (Haram)", az: "Hərəm (Məscidül-Həram)" }, ctx_ar: "ثُمَّ نَنْزِلُ إِلَى الْحَرَمِ", ctx_tr: { ru: "Затем мы спускаемся в Харам", en: "Then we go down to the Haram", az: "Sonra Hərəmə enirik" } },
-        { ar: "الشُّعُورُ", root: "ش - ع - ر", tr: { ru: "Чувство, ощущение", en: "Feeling, sensation", az: "Hiss, duyğu" }, ctx_ar: "الشُّعُورُ هُنَا رَائِعٌ جِدًّا", ctx_tr: { ru: "Ощущение здесь просто потрясающее", en: "The feeling here is truly wonderful", az: "Buradakı hiss çox möhtəşəmdir" } },
-        { ar: "نَطُوفُ", root: "ط - و - ف", tr: { ru: "Мы совершаем таваф", en: "We perform Tawaf", az: "Təvaf edirik" }, ctx_ar: "نَطُوفُ حَوْلَ الْكَعْبَةِ", ctx_tr: { ru: "Мы совершаем обход вокруг Каабы", en: "We circumambulate around the Kaaba", az: "Kəbənin ətrafında təvaf edirik" } },
-        { ar: "نَسْعَى", root: "س - ع - ي", tr: { ru: "Мы совершаем сай", en: "We perform Sa'i", az: "Səy edirik" }, ctx_ar: "نَسْعَى بَيْنَ الصَّفَا وَالْمَرْوَةِ", ctx_tr: { ru: "Мы совершаем сай между Сафой и Марвой", en: "We perform Sa'i between Safa and Marwa", az: "Səfa və Mərvə arasında səy edirik" } },
-        { ar: "سَاحَاتٌ", root: "س - و - ح", tr: { ru: "Площади, дворы", en: "Courtyards, plazas", az: "Meydanlar, həyətlər" }, ctx_ar: "نَمْشِي فِي سَاحَاتِ الْمَسْجِدِ", ctx_tr: { ru: "Мы гуляем по площадям мечети", en: "We walk in the courtyards of the mosque", az: "Məscidin həyətlərində gəzirik" } },
-        { ar: "الْحَمَامُ", root: "ح - م - م", tr: { ru: "Голуби", en: "Pigeons", az: "Göyərçinlər" }, ctx_ar: "نُشَاهِدُ النَّاسَ وَالْحَمَامَ", ctx_tr: { ru: "Мы наблюдаем за людьми и голубями", en: "We watch the people and the pigeons", az: "İnsanları və göyərçinləri izləyirik" } },
-        { ar: "النُّورُ", root: "ن - و - ر", tr: { ru: "Свет, сияние", en: "Light, radiance", az: "Nur, işıq" }, ctx_ar: "يَكُونُ الْمَكَانُ مَلِيئًا بِالنُّورِ", ctx_tr: { ru: "Это место наполнено светом", en: "The place is filled with light", az: "Məkan nurla dolu olur" } }
-    ];
-
-    const uiText = {
-        ru: { tap: "Нажмите, чтобы перевернуть", root: "Корень", flip: "Показать перевод", hard: "Повторить еще", easy: "Запомнил", done: "Вы повторили все слова из выпуска «Поездка в Умру»." },
-        en: { tap: "Tap to flip", root: "Root", flip: "Show translation", hard: "Repeat again", easy: "Got it", done: "You have reviewed all words from the Umrah episode." },
-        az: { tap: "Çevirmək üçün toxunun", root: "Kök", flip: "Tərcüməni göstər", hard: "Yenidən təkrarla", easy: "Yadda saxladım", done: "«Ümrə səfəri» buraxılışındakı bütün sözləri təkrarladınız." }
+    // Поле audio (опционально): если добавить "audio": "audio/umrah/1.mp3", включится ваш MP3.
+    // Если поля audio нет — сработает встроенный арабский голос браузера.
+    const episodesData = {
+        umrah: {
+            title: { ru: "🕌 1. Умра", en: "🕌 1. Umrah", az: "🕌 1. Ümrə" },
+            words: [
+                { ar: "رِحْلَةٌ", root: "ر - ح - ل", tr: { ru: "Путешествие, поездка", en: "Journey, trip", az: "Səyahət, səfər" }, ctx_ar: "نَبْدَأُ رِحْلَةَ الْعُمْرَةِ مِنْ بَاكُو", ctx_tr: { ru: "Мы начинаем путешествие Умры из Баку", en: "We start the Umrah journey from Baku", az: "Bakıdan Ümrə səyahətinə başlayırıq" } },
+                { ar: "الطَّائِرَةُ", root: "ط - ي - ر", tr: { ru: "Самолет", en: "Airplane", az: "Təyyarə" }, ctx_ar: "نَحْنُ الْآنَ فِي الطَّائِرَةِ", ctx_tr: { ru: "Мы сейчас в самолете", en: "We are now on the airplane", az: "Biz indi təyyarədəyik" } },
+                { ar: "السَّحَابُ", root: "س - ح - ب", tr: { ru: "Облака", en: "Clouds", az: "Buludlar" }, ctx_ar: "الْجَوُّ جَمِيلٌ فَوْقَ السَّحَابِ", ctx_tr: { ru: "Погода прекрасна над облаками", en: "The weather is beautiful above the clouds", az: "Buludların üzərində hava gözəldir" } },
+                { ar: "الْأَرْضُ الْمُقَدَّسَةُ", root: "ق - د - س", tr: { ru: "Священная земля", en: "Holy land", az: "Müqəddəs torpaq" }, ctx_ar: "نَقْتَرِبُ مِنَ الْأَرْضِ الْمُقَدَّسَةِ", ctx_tr: { ru: "Мы приближаемся к священной земле", en: "We are approaching the holy land", az: "Müqəddəs torpağa yaxınlaşırıq" } },
+                { ar: "حَقَائِبُ", root: "ح - ق - ب", tr: { ru: "Чемоданы, багаж", en: "Bags, luggage", az: "Çamadanlar, yük" }, ctx_ar: "نَضَعُ حَقَائِبَنَا فِي الْفُنْدُقِ", ctx_tr: { ru: "Мы оставляем наши чемоданы в отеле", en: "We put our bags in the hotel", az: "Çamadanlarımızı otelə qoyuruq" } },
+                { ar: "الْحَرَمُ", root: "ح - ر - م", tr: { ru: "Заповедная мечеть (Харам)", en: "The Sanctuary (Haram)", az: "Hərəm (Məscidül-Həram)" }, ctx_ar: "ثُمَّ نَنْزِلُ إِلَى الْحَرَمِ", ctx_tr: { ru: "Затем мы спускаемся в Харам", en: "Then we go down to the Haram", az: "Sonra Hərəmə enirik" } },
+                { ar: "الشُّعُورُ", root: "ش - ع - ر", tr: { ru: "Чувство, ощущение", en: "Feeling, sensation", az: "Hiss, duyğu" }, ctx_ar: "الشُّعُورُ هُنَا رَائِعٌ جِدًّا", ctx_tr: { ru: "Ощущение здесь просто потрясающее", en: "The feeling here is truly wonderful", az: "Buradakı hiss çox möhtəşəmdir" } },
+                { ar: "نَطُوفُ", root: "ط - و - ف", tr: { ru: "Мы совершаем таваф", en: "We perform Tawaf", az: "Təvaf edirik" }, ctx_ar: "نَطُوفُ حَوْلَ الْكَعْبَةِ", ctx_tr: { ru: "Мы совершаем обход вокруг Каабы", en: "We circumambulate around the Kaaba", az: "Kəbənin ətrafında təvaf edirik" } },
+                { ar: "نَسْعَى", root: "س - ع - ي", tr: { ru: "Мы совершаем сай", en: "We perform Sa'i", az: "Səy edirik" }, ctx_ar: "نَسْعَى بَيْنَ الصَّفَا وَالْمَرْوَةِ", ctx_tr: { ru: "Мы совершаем сай между Сафой и Марвой", en: "We perform Sa'i between Safa and Marwa", az: "Səfa və Mərvə arasında səy edirik" } },
+                { ar: "سَاحَاتٌ", root: "س - و - ح", tr: { ru: "Площади, дворы", en: "Courtyards, plazas", az: "Meydanlar, həyətlər" }, ctx_ar: "نَمْشِي فِي سَاحَاتِ الْمَسْجِدِ", ctx_tr: { ru: "Мы гуляем по площадям мечети", en: "We walk in the courtyards of the mosque", az: "Məscidin həyətlərində gəzirik" } },
+                { ar: "الْحَمَامُ", root: "ح - م - م", tr: { ru: "Голуби", en: "Pigeons", az: "Göyərçinlər" }, ctx_ar: "نُشَاهِدُ النَّاسَ وَالْحَمَامَ", ctx_tr: { ru: "Мы наблюдаем за людьми и голубями", en: "We watch the people and the pigeons", az: "İnsanları və göyərçinləri izləyirik" } },
+                { ar: "النُّورُ", root: "ن - و - ر", tr: { ru: "Свет, сияние", en: "Light, radiance", az: "Nur, işıq" }, ctx_ar: "يَكُونُ الْمَكَانُ مَلِيئًا بِالنُّورِ", ctx_tr: { ru: "Это место наполнено светом", en: "The place is filled with light", az: "Məkan nurla dolu olur" } }
+            ]
+        },
+        sheki: {
+            title: { ru: "🏔 2. Шеки", en: "🏔 2. Sheki", az: "🏔 2. Şəki" },
+            words: [
+                { ar: "الْجِبَالُ", root: "ج - ب - ل", tr: { ru: "Горы", en: "Mountains", az: "Dağlar" }, ctx_ar: "نَتَّجِهُ إِلَى الْجِبَالِ فِي شَكِي", ctx_tr: { ru: "Мы направляемся в горы в Шеки", en: "We head to the mountains in Sheki", az: "Şəkidəki dağlara doğru gedirik" } },
+                { ar: "الْغَابَةُ", root: "غ - ي - ب", tr: { ru: "Лес", en: "Forest", az: "Meşə" }, ctx_ar: "الْهَوَاءُ نَقِيٌّ فِي الْغَابَةِ", ctx_tr: { ru: "Воздух в лесу чистый", en: "The air in the forest is fresh", az: "Meşədə hava təmizdir" } },
+                { ar: "الشَّايُ", root: "ش - و - ي", tr: { ru: "Чай", en: "Tea", az: "Çay" }, ctx_ar: "نَشْرَبُ الشَّايَ السَّاخِنَ", ctx_tr: { ru: "Мы пьем горячий чай", en: "We drink hot tea", az: "İsti çay içirik" } }
+            ]
+        }
     };
 
+    const uiText = {
+        ru: { tap: "Нажмите на карточку, чтобы перевернуть", root: "Корень", flip: "Показать перевод", hard: "Повторить еще", easy: "Запомнил", done: "Вы повторили все слова этого выпуска!", restart: "Повторить заново", listen: "Слушать", phrase: "Озвучить фразу" },
+        en: { tap: "Tap card to flip", root: "Root", flip: "Show translation", hard: "Repeat again", easy: "Got it", done: "You have reviewed all words in this episode!", restart: "Restart", listen: "Listen", phrase: "Play phrase" },
+        az: { tap: "Çevirmək üçün karta toxunun", root: "Kök", flip: "Tərcüməni göstər", hard: "Yenidən təkrarla", easy: "Yadda saxladım", done: "Bu buraxılışdakı bütün sözləri təkrarladınız!", restart: "Yenidən başla", listen: "Dinlə", phrase: "Cümləni dinlə" }
+    };
+
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentEpisode = episodesData[urlParams.get('ep')] ? urlParams.get('ep') : 'umrah';
     let currentLang = 'ru';
-    let queue = [...wordsData];
+    let queue = [];
     let learnedCount = 0;
     let isFlipped = false;
+    let currentAudioPlayer = null;
+
+    // Функция озвучки: сначала ищет MP3 автора, если нет — читает через синтезатор речи (ar-SA)
+    function speakArabic(text, mp3Url = null) {
+        if (currentAudioPlayer) {
+            currentAudioPlayer.pause();
+            currentAudioPlayer = null;
+        }
+        window.speechSynthesis?.cancel();
+
+        if (mp3Url) {
+            currentAudioPlayer = new Audio(mp3Url);
+            currentAudioPlayer.play().catch(() => fallbackTTS(text));
+        } else {
+            fallbackTTS(text);
+        }
+    }
+
+    function fallbackTTS(text) {
+        if (!('speechSynthesis' in window)) return;
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'ar-SA';
+        utterance.rate = 0.85; // Чуть медленнее для четкого восприятия огласовок
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function playWordAudio() {
+        if (queue.length === 0) return;
+        speakArabic(queue[0].ar, queue[0].audio || null);
+    }
+
+    function playContextAudio() {
+        if (queue.length === 0) return;
+        speakArabic(queue[0].ctx_ar, queue[0].ctx_audio || null);
+    }
+
+    function renderEpisodesBar() {
+        const bar = document.getElementById('episodes-bar');
+        bar.innerHTML = '';
+        Object.keys(episodesData).forEach(epKey => {
+            const btn = document.createElement('button');
+            btn.className = 'ep-btn' + (epKey === currentEpisode ? ' active' : '');
+            btn.innerText = episodesData[epKey].title[currentLang];
+            btn.onclick = () => selectEpisode(epKey);
+            bar.appendChild(btn);
+        });
+    }
+
+    function selectEpisode(epKey) {
+        currentEpisode = epKey;
+        restart();
+    }
 
     function setLang(lang) {
         currentLang = lang;
         document.querySelectorAll('.lang-switch button').forEach(b => b.classList.remove('active'));
         document.getElementById('btn-' + lang).classList.add('active');
+        renderEpisodesBar();
         renderCard();
     }
 
     function renderCard() {
+        const totalWords = episodesData[currentEpisode].words.length;
         if (queue.length === 0) {
             document.getElementById('card-area').style.display = 'none';
             document.getElementById('controls').style.display = 'none';
             document.getElementById('done-screen').style.display = 'flex';
             document.getElementById('done-text').innerText = uiText[currentLang].done;
+            document.getElementById('restart-btn').innerText = uiText[currentLang].restart;
             document.getElementById('progress').style.width = '100%';
             return;
         }
@@ -142,14 +245,16 @@
         isFlipped = false;
         document.getElementById('flashcard').classList.remove('flipped');
         document.getElementById('word-ar').innerText = item.ar;
+        document.getElementById('listen-word-txt').innerText = uiText[currentLang].listen;
+        document.getElementById('listen-ctx-txt').innerText = uiText[currentLang].phrase;
         document.getElementById('tap-hint').innerText = uiText[currentLang].tap;
         document.getElementById('word-root').innerText = `${uiText[currentLang].root}: ${item.root}`;
         document.getElementById('word-tr').innerText = item.tr[currentLang];
         document.getElementById('ctx-ar').innerText = item.ctx_ar;
         document.getElementById('ctx-tr').innerText = item.ctx_tr[currentLang];
 
-        document.getElementById('counter').innerText = `${learnedCount + 1} / ${wordsData.length}`;
-        document.getElementById('progress').style.width = `${(learnedCount / wordsData.length) * 100}%`;
+        document.getElementById('counter').innerText = `${learnedCount + 1} / ${totalWords}`;
+        document.getElementById('progress').style.width = `${(learnedCount / totalWords) * 100}%`;
 
         document.getElementById('controls').innerHTML = `<button class="btn btn-flip" onclick="flipCard()">${uiText[currentLang].flip}</button>`;
     }
@@ -165,26 +270,28 @@
     }
 
     function answer(known) {
+        window.speechSynthesis?.cancel();
+        if (currentAudioPlayer) currentAudioPlayer.pause();
         const current = queue.shift();
         if (known) {
             learnedCount++;
         } else {
-            // Возвращаем трудное слово через 2 карточки (интервальное повторение)
             queue.splice(Math.min(2, queue.length), 0, current);
         }
         renderCard();
     }
 
     function restart() {
-        queue = [...wordsData];
+        queue = [...episodesData[currentEpisode].words];
         learnedCount = 0;
         document.getElementById('card-area').style.display = 'flex';
         document.getElementById('controls').style.display = 'grid';
         document.getElementById('done-screen').style.display = 'none';
+        renderEpisodesBar();
         renderCard();
     }
 
-    renderCard();
+    restart();
 </script>
 </body>
 </html>
